@@ -28,6 +28,30 @@ Production build: `npm run build --prefix client` (→ `client/dist`), then `npm
 
 The API listens on **`PORT` from `server/.env`, which is `5050`**, and the Vite dev server (`:5173`) proxies `/api/*` to `localhost:5050` (see `client/vite.config.js`). The README's mention of port 5000 is stale — trust the `.env`/proxy. If you change the API port, update the Vite proxy target to match.
 
+## Repository Structure
+
+```
+homemade-delights/
+├── package.json          # root scripts (concurrently runs both apps)
+├── server/               # Express + Mongoose API
+│   ├── src/
+│   │   ├── index.js      # app entry
+│   │   ├── seed.js       # seeds weekly menu, specials, admin
+│   │   ├── config/       # db connection + business constants
+│   │   ├── models/       # Admin, WeeklyMenu, DailyMenu, SpecialItem, Order
+│   │   ├── middleware/   # JWT auth guard
+│   │   ├── routes/       # auth, menu, specials, orders, config
+│   │   └── utils/        # date (SG timezone) + pricing (combo logic)
+│   └── .env.example
+└── client/               # React + Vite frontend
+    └── src/
+        ├── pages/        # Home, Menu, Specials, Order, OrderConfirm
+        │   └── admin/    # Login, Dashboard, ManageMenu, ManageOrders
+        ├── components/   # Navbar, Footer, MealCard, WhatsAppButton, ...
+        ├── context/      # ConfigContext, AuthContext
+        └── api.js        # fetch wrapper with JWT
+```
+
 ## Architecture
 
 **Config is single-sourced and duplicated on the client — keep them in sync.** `server/src/config/business.js` is the authoritative source for business details, `PRICING`, and `TIMINGS`. It's served at `GET /api/config` and consumed by `client/src/context/ConfigContext.jsx` via `useConfig()`. That context also hard-codes a `FALLBACK` copy of the same values (so the UI renders before the API responds) — **when you change `business.js`, update the `FALLBACK` to match** or the offline/initial render will drift.

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(curl -s http://localhost:5174/api/config)",
+      "Bash(python3 -c \"import sys,json; print\\('regularMeal $'+str\\(json.load\\(sys.stdin\\)['pricing']['regularMeal']\\)\\)\")",
+      "Bash(curl -s http://localhost:5174/api/specials)",
+      "Bash(python3 -c \"import sys,json; print\\([s['name'] for s in json.load\\(sys.stdin\\)]\\)\")"
+    ]
+  }
+}

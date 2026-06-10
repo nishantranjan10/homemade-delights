@@ -27,7 +27,7 @@ export default function Order() {
 
   const [mealType, setMealType] = useState(initialMeal);
   const [preferredDate, setPreferredDate] = useState(sgToday());
-  const [mealQty, setMealQty] = useState(1);
+  const [mealQtys, setMealQtys] = useState({ Lunch: 1, Dinner: 1 }); // per meal type
   const [specialQty, setSpecialQty] = useState({}); // { specialId: qty }
   const [specials, setSpecials] = useState([]);
   const [menuForDate, setMenuForDate] = useState(null);
@@ -71,11 +71,11 @@ export default function Order() {
     return [
       {
         name: `${mealType} Thali${contents}`,
-        quantity: mealQty,
+        quantity: mealQtys[mealType],
         unitPrice: pricing.regularMeal,
       },
     ];
-  }, [mealType, specialQty, specials, menuForDate, mealQty, pricing]);
+  }, [mealType, specialQty, specials, menuForDate, mealQtys, pricing]);
 
   const total = computeTotal(lineItems, mealType, pricing);
   const itemCount = lineItems.reduce((s, it) => s + it.quantity, 0);
@@ -193,8 +193,10 @@ export default function Order() {
                     {mealType} Thali — {money(pricing.regularMeal)} each
                   </span>
                   <QtyStepper
-                    value={mealQty}
-                    onChange={(v) => setMealQty(Math.max(1, v))}
+                    value={mealQtys[mealType]}
+                    onChange={(v) =>
+                      setMealQtys((q) => ({ ...q, [mealType]: Math.max(1, v) }))
+                    }
                     min={1}
                   />
                 </div>

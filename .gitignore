@@ -7,4 +7,4 @@ build/
 npm-debug.log*
 client/.vite/
 coverage/
-.claude/
+.claude/settings.local.json

@@ -68,7 +68,7 @@ cp server/.env.example server/.env
 Edit `server/.env` and set at minimum a strong `JWT_SECRET` and your `MONGO_URI`.
 
 ```env
-PORT=5000
+PORT=5050
 MONGO_URI=mongodb://127.0.0.1:27017/rupalis_delights
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_EXPIRES_IN=7d
@@ -86,7 +86,7 @@ npm run seed
 
 ### 4. Run in development
 ```bash
-npm run dev          # runs API (:5000) and client (:5173) together
+npm run dev          # runs API (:5050) and client (:5173) together
 ```
 Or run them separately:
 ```bash
@@ -133,7 +133,7 @@ Order status flow: **Pending → Confirmed → Delivered** (or Cancelled).
 | Combo: any 2 specials         | $25   |
 
 Combo pricing is applied automatically server-side: every 2 special units are
-billed at $25, any remainder at $15 each (verified by tests).
+billed at $25, any remainder at $15 each.
 
 ---
 

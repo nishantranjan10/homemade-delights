@@ -1,0 +1,16 @@
+{
+  "name": "rupalis-homemade-delights",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack web app for Rupali's Homemade Delights — a home food business in Singapore",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "seed": "npm run seed --prefix server",
+    "dev": "concurrently -n server,client -c green,cyan \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

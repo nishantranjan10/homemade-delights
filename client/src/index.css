@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cream-100 text-forest-900 font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-saffron-600 text-white hover:bg-saffron-700;
+  }
+  .btn-outline {
+    @apply btn border-2 border-saffron-600 text-saffron-700 hover:bg-saffron-50;
+  }
+  .btn-whatsapp {
+    @apply btn bg-[#25D366] text-white hover:bg-[#1ebe5d];
+  }
+  .card {
+    @apply rounded-2xl bg-white shadow-md ring-1 ring-saffron-100;
+  }
+  .input {
+    @apply w-full rounded-lg border border-saffron-200 bg-cream-50 px-4 py-2.5 text-forest-900 outline-none focus:border-saffron-500 focus:ring-2 focus:ring-saffron-200;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-forest-800;
+  }
+  .badge {
+    @apply inline-block rounded-full px-3 py-1 text-xs font-semibold;
+  }
+}
+
+/* Subtle decorative banner pattern reminiscent of a printed flyer. */
+.flyer-stripe {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(240, 100, 0, 0.06),
+    rgba(240, 100, 0, 0.06) 12px,
+    transparent 12px,
+    transparent 24px
+  );
+}

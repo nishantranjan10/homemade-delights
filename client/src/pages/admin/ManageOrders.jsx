@@ -55,6 +55,7 @@ export default function ManageOrders() {
             <option>Lunch</option>
             <option>Dinner</option>
             <option>Special Order</option>
+            <option>Mixed</option>
           </select>
         </div>
         <div>

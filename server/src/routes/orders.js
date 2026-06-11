@@ -12,7 +12,6 @@ router.post('/', async (req, res) => {
     customerName,
     phone,
     address,
-    mealType,
     items,
     fulfilment,
     preferredDate,
@@ -20,7 +19,7 @@ router.post('/', async (req, res) => {
     notes,
   } = req.body || {};
 
-  if (!customerName || !phone || !mealType || !fulfilment || !preferredDate || !paymentMethod) {
+  if (!customerName || !phone || !fulfilment || !preferredDate || !paymentMethod) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
   if (!Array.isArray(items) || items.length === 0) {
@@ -30,7 +29,15 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Address is required for delivery' });
   }
 
-  const total = computeTotal(items, mealType);
+  // Derive the order meal type from its line items: a single category keeps
+  // its name, anything spanning more than one becomes 'Mixed'.
+  const types = [...new Set(items.map((it) => it.mealType).filter(Boolean))];
+  const mealType = types.length > 1 ? 'Mixed' : types[0];
+  if (!mealType) {
+    return res.status(400).json({ message: 'Each item must have a meal type' });
+  }
+
+  const total = computeTotal(items);
 
   const order = await Order.create({
     customerName,

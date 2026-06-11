@@ -5,6 +5,14 @@ const orderItemSchema = new mongoose.Schema(
     name: { type: String, required: true },
     quantity: { type: Number, required: true, min: 1 },
     unitPrice: { type: Number, required: true },
+    // Which meal type this line belongs to — lets a single order mix
+    // Lunch, Dinner, and Special Order items while keeping combo pricing
+    // scoped to the specials.
+    mealType: {
+      type: String,
+      required: true,
+      enum: ['Lunch', 'Dinner', 'Special Order'],
+    },
   },
   { _id: false }
 );
@@ -17,7 +25,7 @@ const orderSchema = new mongoose.Schema(
     mealType: {
       type: String,
       required: true,
-      enum: ['Lunch', 'Dinner', 'Special Order'],
+      enum: ['Lunch', 'Dinner', 'Special Order', 'Mixed'],
     },
     items: { type: [orderItemSchema], required: true },
     fulfilment: { type: String, required: true, enum: ['Pickup', 'Delivery'] },

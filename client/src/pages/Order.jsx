@@ -7,13 +7,23 @@ import { sgToday, prettyDate, money, whatsappLink } from '../utils.js';
 const MEAL_TYPES = ['Lunch', 'Dinner', 'Special Order'];
 
 // Mirror of the server-side combo pricing so the customer sees the live total.
-function computeTotal(lineItems, mealType, pricing) {
-  if (mealType !== 'Special Order') {
-    return lineItems.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
+// Special-Order lines get the combo deal; Lunch/Dinner thalis are billed flat.
+function computeTotal(lineItems, pricing) {
+  let total = 0;
+  let specialUnits = 0;
+  for (const it of lineItems) {
+    if (it.mealType === 'Special Order') {
+      specialUnits += it.quantity;
+    } else {
+      total += it.unitPrice * it.quantity;
+    }
   }
-  const units = lineItems.reduce((s, it) => s + it.quantity, 0);
-  const combos = Math.floor(units / pricing.comboSize);
-  return combos * pricing.comboPrice + (units % pricing.comboSize) * pricing.specialItem;
+  const combos = Math.floor(specialUnits / pricing.comboSize);
+  return (
+    total +
+    combos * pricing.comboPrice +
+    (specialUnits % pricing.comboSize) * pricing.specialItem
+  );
 }
 
 export default function Order() {
@@ -25,9 +35,13 @@ export default function Order() {
     ? params.get('mealType')
     : 'Lunch';
 
-  const [mealType, setMealType] = useState(initialMeal);
   const [preferredDate, setPreferredDate] = useState(sgToday());
-  const [mealQtys, setMealQtys] = useState({ Lunch: 1, Dinner: 1 }); // per meal type
+  // Quantities are tracked per meal type so one order can mix Lunch, Dinner,
+  // and Specials. A thali deep-link (?mealType=) pre-selects that meal.
+  const [mealQtys, setMealQtys] = useState({
+    Lunch: initialMeal === 'Lunch' ? 1 : 0,
+    Dinner: initialMeal === 'Dinner' ? 1 : 0,
+  });
   const [specialQty, setSpecialQty] = useState({}); // { specialId: qty }
   const [specials, setSpecials] = useState([]);
   const [menuForDate, setMenuForDate] = useState(null);
@@ -55,33 +69,45 @@ export default function Order() {
       .catch(() => setMenuForDate(null));
   }, [preferredDate]);
 
-  // Build API line items from the current selection.
+  // Build API line items from every non-zero selection across meal types.
   const lineItems = useMemo(() => {
-    if (mealType === 'Special Order') {
-      return specials
-        .filter((s) => specialQty[s._id] > 0)
-        .map((s) => ({
-          name: s.name,
-          quantity: specialQty[s._id],
-          unitPrice: s.price ?? pricing.specialItem,
-        }));
+    const items = [];
+    for (const mt of ['Lunch', 'Dinner']) {
+      const qty = mealQtys[mt];
+      if (qty > 0) {
+        const meal = menuForDate?.meals?.[mt];
+        const contents = meal?.items?.length ? ` — ${meal.items.join(', ')}` : '';
+        items.push({
+          name: `${mt} Thali${contents}`,
+          quantity: qty,
+          unitPrice: pricing.regularMeal,
+          mealType: mt,
+        });
+      }
     }
-    const meal = menuForDate?.meals?.[mealType];
-    const contents = meal?.items?.length ? ` — ${meal.items.join(', ')}` : '';
-    return [
-      {
-        name: `${mealType} Thali${contents}`,
-        quantity: mealQtys[mealType],
-        unitPrice: pricing.regularMeal,
-      },
-    ];
-  }, [mealType, specialQty, specials, menuForDate, mealQtys, pricing]);
+    for (const s of specials) {
+      const qty = specialQty[s._id];
+      if (qty > 0) {
+        items.push({
+          name: s.name,
+          quantity: qty,
+          unitPrice: s.price ?? pricing.specialItem,
+          mealType: 'Special Order',
+        });
+      }
+    }
+    return items;
+  }, [specialQty, specials, menuForDate, mealQtys, pricing]);
 
-  const total = computeTotal(lineItems, mealType, pricing);
+  const total = computeTotal(lineItems, pricing);
   const itemCount = lineItems.reduce((s, it) => s + it.quantity, 0);
 
   function setField(k, v) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function setMealQty(mt, v) {
+    setMealQtys((q) => ({ ...q, [mt]: Math.max(0, v) }));
   }
 
   function bumpSpecial(id, delta) {
@@ -95,7 +121,7 @@ export default function Order() {
     const lines = [
       `Hi ${business.name}! I'd like to place an order:`,
       ``,
-      `*${mealType}* for ${prettyDate(preferredDate)}`,
+      `*Order* for ${prettyDate(preferredDate)}`,
       ...lineItems.map((it) => `• ${it.name} × ${it.quantity}`),
       ``,
       `Fulfilment: ${form.fulfilment}`,
@@ -127,7 +153,6 @@ export default function Order() {
     try {
       const order = await api.post('/orders', {
         ...form,
-        mealType,
         preferredDate,
         items: lineItems,
       });
@@ -141,9 +166,6 @@ export default function Order() {
     }
   }
 
-  const isSpecial = mealType === 'Special Order';
-  const activeTiming = mealType === 'Dinner' ? timings.dinner : timings.lunch;
-
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="text-center font-serif text-4xl font-bold text-saffron-700">
@@ -154,97 +176,80 @@ export default function Order() {
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-        {/* Meal type */}
+        {/* Item selection — mix lunch, dinner, and specials in one order */}
         <div className="card p-5">
-          <label className="label">1. Choose meal type</label>
-          <div className="grid grid-cols-3 gap-2">
-            {MEAL_TYPES.map((mt) => (
-              <button
-                type="button"
-                key={mt}
-                onClick={() => setMealType(mt)}
-                className={`rounded-xl border-2 px-2 py-3 text-sm font-semibold transition-colors ${
-                  mealType === mt
-                    ? 'border-saffron-600 bg-saffron-600 text-white'
-                    : 'border-saffron-200 bg-cream-50 text-forest-700 hover:bg-saffron-50'
-                }`}
-              >
-                {mt === 'Lunch' ? '🌞 ' : mt === 'Dinner' ? '🌙 ' : '⭐ '}
-                {mt}
-              </button>
-            ))}
-          </div>
-          {!isSpecial && (
-            <p className="mt-3 rounded-lg bg-cream-100 px-3 py-2 text-xs text-forest-600">
-              🕐 {activeTiming.window} · {activeTiming.cutoff}
-            </p>
-          )}
-        </div>
+          <label className="label">1. Select your items</label>
+          <p className="mb-3 text-xs text-forest-500">
+            Add any combination of lunch, dinner, and specials.
+          </p>
 
-        {/* Item selection */}
-        <div className="card p-5">
-          <label className="label">2. Select items</label>
-
-          {!isSpecial ? (
-            <div>
-              <div className="rounded-xl bg-cream-100 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-forest-800">
-                    {mealType} Thali — {money(pricing.regularMeal)} each
-                  </span>
-                  <QtyStepper
-                    value={mealQtys[mealType]}
-                    onChange={(v) =>
-                      setMealQtys((q) => ({ ...q, [mealType]: Math.max(1, v) }))
-                    }
-                    min={1}
-                  />
+          <div className="space-y-3">
+            {['Lunch', 'Dinner'].map((mt) => {
+              const meal = menuForDate?.meals?.[mt];
+              const timing = mt === 'Dinner' ? timings.dinner : timings.lunch;
+              return (
+                <div key={mt} className="rounded-xl bg-cream-100 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-forest-800">
+                      {mt === 'Lunch' ? '🌞 ' : '🌙 '}
+                      {mt} Thali — {money(pricing.regularMeal)} each
+                    </span>
+                    <QtyStepper
+                      value={mealQtys[mt]}
+                      onChange={(v) => setMealQty(mt, v)}
+                      min={0}
+                    />
+                  </div>
+                  {meal?.items?.length ? (
+                    <p className="mt-2 text-sm text-forest-600">
+                      Includes: {meal.items.join(', ')}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-forest-500">
+                      Menu for this date will be confirmed by Rupali.
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-forest-500">
+                    🕐 {timing.window} · {timing.cutoff}
+                  </p>
                 </div>
-                {menuForDate?.meals?.[mealType]?.items?.length ? (
-                  <p className="mt-2 text-sm text-forest-600">
-                    Includes: {menuForDate.meals[mealType].items.join(', ')}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-sm text-forest-500">
-                    Menu for this date will be confirmed by Rupali.
-                  </p>
+              );
+            })}
+
+            <div className="rounded-xl bg-cream-100 p-4">
+              <div className="font-semibold text-forest-800">⭐ Special Order</div>
+              <div className="mt-2 space-y-2">
+                {specials.map((s) => (
+                  <div
+                    key={s._id}
+                    className="flex items-center justify-between rounded-lg bg-cream-50 px-3 py-2"
+                  >
+                    <div>
+                      <div className="font-medium text-forest-800">{s.name}</div>
+                      <div className="text-xs text-forest-500">{money(s.price)} each</div>
+                    </div>
+                    <QtyStepper
+                      value={specialQty[s._id] || 0}
+                      onChange={(v) => bumpSpecial(s._id, v - (specialQty[s._id] || 0))}
+                      min={0}
+                    />
+                  </div>
+                ))}
+                {specials.length === 0 && (
+                  <p className="text-sm text-forest-500">No specials available.</p>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {specials.map((s) => (
-                <div
-                  key={s._id}
-                  className="flex items-center justify-between rounded-xl bg-cream-100 px-4 py-3"
-                >
-                  <div>
-                    <div className="font-semibold text-forest-800">{s.name}</div>
-                    <div className="text-xs text-forest-500">
-                      {money(s.price)} each
-                    </div>
-                  </div>
-                  <QtyStepper
-                    value={specialQty[s._id] || 0}
-                    onChange={(v) => bumpSpecial(s._id, v - (specialQty[s._id] || 0))}
-                    min={0}
-                  />
-                </div>
-              ))}
-              {specials.length === 0 && (
-                <p className="text-sm text-forest-500">No specials available.</p>
-              )}
-              <p className="rounded-lg bg-saffron-50 px-3 py-2 text-xs text-saffron-700">
+              <p className="mt-2 rounded-lg bg-saffron-50 px-3 py-2 text-xs text-saffron-700">
                 🎉 Combo: any {pricing.comboSize} specials = {money(pricing.comboPrice)} (auto-applied)
               </p>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Fulfilment & date */}
         <div className="card grid gap-4 p-5 sm:grid-cols-2">
           <div>
-            <label className="label">3. Pickup or Delivery</label>
+            <label className="label">2. Pickup or Delivery</label>
             <div className="grid grid-cols-2 gap-2">
               {business.fulfilment.map((f) => (
                 <button
@@ -327,7 +332,7 @@ export default function Order() {
 
         {/* Payment */}
         <div className="card p-5">
-          <label className="label">4. Payment method</label>
+          <label className="label">3. Payment method</label>
           <div className="grid grid-cols-3 gap-2">
             {business.paymentMethods.map((p) => (
               <button
